@@ -5,11 +5,11 @@
 
 import os
 import sys
-import cgi
 import time
 import types
 import select
 import socket
+import urllib
 import tarfile
 import http.client
 import tempfile
@@ -89,7 +89,7 @@ class Server(Partner):
     dont_cause_conflict = set([EventTypes.STARTED_PROGRAM,
         EventTypes.STOPPED_PROGRAM, EventTypes.STARTED_SCHEDULER,
         EventTypes.LOADED_DATABASE, EventTypes.SAVED_DATABASE,
-        EventTypes.EDITED_CRITERION])
+        EventTypes.EDITED_CRITERION, EventTypes.WARNED_TOO_MANY_CARDS])
 
     def __init__(self, machine_id, port, ui):
         self.machine_id = machine_id
@@ -152,7 +152,7 @@ class Server(Partner):
         # Convert e.g. GET /foo_bar into get_foo_bar.
         method = (environ["REQUEST_METHOD"] + \
                   environ["PATH_INFO"].replace("/", "_")).lower()
-        args = cgi.parse_qs(environ["QUERY_STRING"])
+        args = urllib.parse.parse_qs(environ["QUERY_STRING"])
         args = dict([(key, val[0]) for key, val in list(args.items())])
         # Login method.
         if method == "put_login" or method == "get_status":
@@ -235,6 +235,7 @@ class Server(Partner):
             self.terminate_session_with_token(session_token)
 
     def handle_error(self, session=None, traceback_string=None):
+        print(traceback_string)
         self.ui.close_progress()
         if session:
             self.terminate_session_with_token(session.token)
@@ -507,6 +508,7 @@ class Server(Partner):
             if session.client_info["upload_science_logs"]:
                 session.database.skip_science_log()
         except:
+            print(traceback_string())
             session.apply_error = traceback_string()
 
     def get_server_entire_database(self, environ, session_token):

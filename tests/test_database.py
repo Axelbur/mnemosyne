@@ -2,11 +2,11 @@
 # test_database.py <Peter.Bienstman@UGent.be>
 #
 
+import datetime
 import os
 import sys
 import shutil
-
-from nose.tools import raises
+import time
 
 from openSM2sync.log_entry import EventTypes
 
@@ -16,10 +16,11 @@ from mnemosyne.libmnemosyne import Mnemosyne
 from mnemosyne.libmnemosyne.utils import expand_path
 from mnemosyne.libmnemosyne.ui_components.main_widget import MainWidget
 
-HOUR = 60 * 60 # Seconds in an hour.
-DAY = 24 * HOUR # Seconds in a day.
+HOUR = 60 * 60  # Seconds in an hour.
+DAY = 24 * HOUR  # Seconds in a day.
 
 answer = None
+
 
 class Widget(MainWidget):
 
@@ -43,7 +44,7 @@ class TestDatabase(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-            ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+            ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_database", "Widget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -675,23 +676,26 @@ class TestDatabase(MnemosyneTest):
         card_type = self.card_type_with_id("1")
         card = self.controller().create_new_cards(fact_data, card_type,
                                  grade=-1, tag_names=["a", "b"])[0]
+        card__id_1 = card._id
         fact_data = {"f": "question2",
                      "b": "answer"}
         card = self.controller().create_new_cards(fact_data, card_type,
                                  grade=-1, tag_names=["a"])[0]
+        card__id_2 = card._id
         fact_data = {"f": "question3",
                      "b": "answer"}
         card = self.controller().create_new_cards(fact_data, card_type,
                                  grade=-1, tag_names=["c"])[0]
+        card__id_3 = card._id
 
-        for tag in self.database().tags_from_cards_with_internal_ids([1, 2]):
-            assert tag._id in [2, 3]
+        for tag in self.database().tags_from_cards_with_internal_ids([card__id_1, card__id_2]):
+            assert tag.name in ["a", "b"]
 
-        for tag in self.database().tags_from_cards_with_internal_ids([2]):
-            assert tag._id in [2]
+        for tag in self.database().tags_from_cards_with_internal_ids([card__id_2]):
+            assert tag.name in ["a"]
 
-        for tag in self.database().tags_from_cards_with_internal_ids([2, 3]):
-            assert tag._id in [2, 4]
+        for tag in self.database().tags_from_cards_with_internal_ids([card__id_2, card__id_3]):
+            assert tag.name in ["a", "c"]
 
     def test_tag_all_duplicates(self):
         fact_data = {"f": "question",
@@ -808,3 +812,111 @@ class TestDatabase(MnemosyneTest):
         assert set((self.database().\
            known_recognition_questions_from_card_types_ids(\
                ["6", "3::my_3", "3::my_3_bis"]))) == set(["yes_1", "yes_2"])
+
+    def _start_and_end_timestamp(self):
+        timestamp = time.time() - 0 - self.config()["day_starts_at"] * HOUR
+        date_only = datetime.date.fromtimestamp(timestamp)  # Local date.
+        start_of_day = int(time.mktime(date_only.timetuple()))
+        start_of_day += self.config()["day_starts_at"] * HOUR
+
+        return start_of_day, start_of_day + DAY
+
+    def test_has_already_warned(self):
+        now = int(time.time())
+
+        start_of_day, end_of_day = self._start_and_end_timestamp()
+
+        assert self.database().has_already_warned_today(start_of_day, start_of_day + DAY) == False
+        self.database().log_warn_about_too_many_cards(now)
+        assert self.database().has_already_warned_today(start_of_day, start_of_day + DAY) == True
+
+    def test_fact_ids_forgotten_and_learned_today(self):
+        start_of_day, end_of_day = self._start_and_end_timestamp()
+
+        assert list(self.database().fact_ids_forgotten_and_learned_today(start_of_day, end_of_day)) == []
+
+        # create 5 cards with id 1..5
+        cards = self._create_n_test_cards(5)
+
+        # forgot 5 cards (only log)
+        last_timestamp = self._generate_n_forgotten_card_logs(5, cards)
+
+        # learn 3 forgotten cards (only log)
+        self._learn_n_forgotten_cards_logs(3, last_timestamp, cards)
+
+        forgotten_and_learned = self.database().fact_ids_forgotten_and_learned_today(start_of_day, end_of_day)
+
+        assert len([x for x in forgotten_and_learned]) == 3
+
+    def test_fact_ids_newly_learned_today(self):
+        start_of_day, end_of_day = self._start_and_end_timestamp()
+
+        cards = self._create_n_test_cards(15)
+
+        new_fact_ids = [_fact_ids for _fact_ids in self.database().fact_ids_newly_learned_today(start_of_day, end_of_day)]
+        assert len(new_fact_ids) == 0
+
+        self._learn_n_new_cards_logs(7, start_of_day, cards)
+
+        new_fact_ids = [_fact_ids for _fact_ids in self.database().fact_ids_newly_learned_today(start_of_day, end_of_day)]
+        assert len(new_fact_ids) == 7
+
+    def _create_n_test_cards(self, n):
+        """a helper function to generate n cards
+
+        """
+        cards = []
+        card_type = self.card_type_with_id("1")
+        for i in range(n):
+            fact_data = {"f": "foreign word %d" % i,
+                         "p_1": "pronunciation %d" % i,
+                         "m_1": "translation %d" % i}
+            c = self.controller().create_new_cards(fact_data, card_type,
+                                                   grade=-1, tag_names=["default"])
+            cards.append(c[0])
+        return cards
+
+    def _generate_n_forgotten_card_logs(self, n, cards):
+        """a helper function to generate n forgotten cards log entry
+
+        """
+        start_of_day, end_of_day = self._start_and_end_timestamp()
+
+        fake_timestamp = start_of_day + 300
+        for x in range(n):
+            self.database().con.execute(
+                """insert into log(event_type, timestamp, object_id,
+                grade, ret_reps, lapses)
+                values(?,?,?,?,?,?)""",
+                (EventTypes.REPETITION, int(fake_timestamp), cards[x].id, 1, 1, 1))
+            fake_timestamp += 300
+
+        return fake_timestamp
+
+    def _learn_n_forgotten_cards_logs(self, n, start_timestamp, cards):
+        """a helper function to re-learn n forgotten cards log entry
+
+        """
+
+        fake_timestamp = start_timestamp + 300
+        for x in range(n):
+            self.database().con.execute(
+                """insert into log(event_type, timestamp, object_id,
+                grade, ret_reps, lapses)
+                values(?,?,?,?,?,?)""",
+                (EventTypes.REPETITION, int(fake_timestamp), cards[x].id, 2, 1, 1))
+            fake_timestamp += 300
+
+    def _learn_n_new_cards_logs(self, n, start_timestamp, cards):
+        """a helper function to learn n new cards log entry
+
+        """
+
+        fake_timestamp = start_timestamp + 300
+        for x in range(n):
+            self.database().con.execute(
+                """insert into log(event_type, timestamp, object_id,
+                grade, ret_reps, lapses)
+                values(?,?,?,?,?,?)""",
+                (EventTypes.REPETITION, int(fake_timestamp), cards[x].id, 2, 0, 0))
+            fake_timestamp += 300

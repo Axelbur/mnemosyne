@@ -1,19 +1,13 @@
--check only database version
-
--test Anki cards on Android
--update website, import, shared decks
+- pg down in browser when showing only production cards
 
 Android:
 
--integrated error reporting:
-https://developers.google.com/analytics/devguides/collection/android/v4/exceptions
-http://stackoverflow.com/questions/11552963/how-to-get-crash-dialog-with-report-button
+- targetSdkVersion  29
+- better way to use sdcard
+-look into fixes reported by dashboard
 -check 'redraw now'
--Cramming widget for Android
--decrease size of python library
--precompile python files
--pybridge: don't extract individual assets but extract zip file? Faster?
--setting to allow choosing the database location?\
+-cramming widget for Android
+-setting to allow choosing the database location?
 -revisit multiple database option?
 -'sync' button should sync directly without going through the sync settings
  dialog. Put the settings in a settings window instead.
@@ -28,6 +22,31 @@ http://stackoverflow.com/questions/11552963/how-to-get-crash-dialog-with-report-
 
 
 Minor bugs / issues:
+
+- datetime.datetime.now() does not seem to respect DST inside Mnemosyne, but it does work in a standalone Python programme.
+-saving of folded tree state also from 'activate cards' dialog
+-upgrade pyinstaller if this issues is fixed:
+https://stackoverflow.com/questions/57517371/matplotlibdeprecationwarning-with-pyinstaller-exe (used option 2 as a workaround)
+-test speed of new cheroot
+-editing a tag by clicking in the tree does not get saved
+- wheelock anki deck:
+  - where does div on import appear? e.g. numerus
+  - searching for div turns up wrong results?
+  - empty ()
+- checking for unused tags scales badly when deleting 1500 cards
+- can result in deleting same tag twice?
+-Are the configuration settings properly synced?
+-Delete current card which is sentence card with only a sentence field does not
+ seem to work.
+-Adding the "enabled" tag does not automatically get rid of the cross-out in the
+ card browser.
+-Prevent commas in tag names also when using 'create_new_cards' in script.
+-Incoming sync when card browser is open does not work.
+-Add cloze from card browser, preview does not update correctly
+ to show new number of cards
+-For Latex on OSX: try and have OSX search system paths, or otherwise edit config.py
+ latex = "/Library/TeX/texbin/latex -output-format=dvi -interaction=nonstopmode"
+ dvipng = "/Library/TeX/texbin/dvipng -D 200 -T tight tmp.dvi"
 -Anki: Q and A align top, no boundaries around content: document how to add CSS
  to fix this?
 -sometimes scheduled counter goes negative? Hard to reproduce...
@@ -48,6 +67,8 @@ Minor bugs / issues:
 -"A <audio> B" displays only "A"
 -test if initial sync on Android download archive files download, using a custom
  dot_test directory
+-merge and edit dialog: if the cards contain too much info, the window is so
+ large that the buttons are not visible.
 -edit card to update a media file, sync with 'check for updated media files on
  client fails'
 -server.py imports from libmnemosyne.utils
@@ -119,13 +140,13 @@ Milesteiner
  defined in the ui file.
 -Qt bug? cannot define sq escape character to search for literal _
 -Qt bug? Kanji does not scale, but latin does
-  厳�?�?�警戒<span style="font-size:24pt;">test 厳�?�?�警戒</span>
+  åŽ³é‡?ã?ªè­¦æˆ’<span style="font-size:24pt;">test åŽ³é‡?ã?ªè­¦æˆ’</span>
 -Qt bug
 1. Add new card
 2. Enter "test" on front
-3. Enter "� test �" (alt+174, alt+175) on back
+3. Enter "« test »" (alt+174, alt+175) on back
 The card gets closed the moment one has hit the alt+..5 key and a new card is
-created with just the "�" symbol.
+created with just the "»" symbol.
 -Qt bug: enabling word wrap on tag label breaks setting of stretch factors in
  q and a
 -Qt issue: toggling a tag in the card browser using 'space' does not update the
@@ -149,6 +170,12 @@ created with just the "�" symbol.
 
 Other features:
 
+- 'not' operator in searches
+
+- switch to PyOxidizer when it supports PyQt?
+
+- plugin to deactivate cards in a certain cardtype after X retention reps.
+
 -check for required fields when using the Anki card type.
 
 -first doing a count and then the actual a query is not a good idea:?
@@ -163,6 +190,7 @@ time 'number_of_log_entries_to_sync_for' vs 'number_of_log_entries'
   # Important: fact,
 media, tag (check all 'already_imported' statements)
 
+- broccoli integration? https://github.com/epfl-dlab/broccoli-plugin
 
 
 -status bar: scheduled: x / not memorised: x / goal new cards: x/y
@@ -185,6 +213,8 @@ Other learning modes:
 -generate end message for new learning modes. (learn ahead of schedule is not
 always relevant)
 
+-new scheduler Bayesian: https://github.com/fasiha/ebisu
+
 
 -drawing canvas Gnome
 
@@ -204,6 +234,8 @@ always relevant)
 -memrise importer
 
 -type answer
+
+-option to search in tag tree?
 
 -new learning modes for initial learning of tag? multiple choice? Select audio?
 
@@ -531,8 +563,20 @@ http://stackoverflow.com/questions/611459/how-to-sort-text-in-sqlite3-with-speci
 
 Multiuser statistics analysis:
 
--break out card id stringss to a different table and use interger _id in the
+-break out card id strings to a different table and use integer _id in the
  rest of the database to save space
 -move times from a later start date to save space?
 -investigate origin of ._ logs
 -don't do card checks for post 2.0
+
+
+Design warts:
+
+- config storage, is now scattered over 3 places (config.db, config.py,
+  database.db). At least config.py should go and be replaced by an
+  advanced settings menu. Document a standard way for plugins to
+  save settings. Rework everything better in the sync protocol.
+  Other issue related to storage is that built-in CardTypes like Sentence cannot store extra_data, so we resorted to e.g.
+  storing the language info in config.db
+- related: config().card_type_property(): refactor to be members of card_type as
+  opposed to of config.py

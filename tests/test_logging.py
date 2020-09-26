@@ -4,6 +4,7 @@
 
 import os
 import shutil
+import time
 
 from mnemosyne_test import MnemosyneTest
 from mnemosyne.libmnemosyne import Mnemosyne
@@ -26,7 +27,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -211,7 +212,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -231,7 +232,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -292,7 +293,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=True, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -304,7 +305,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=True, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -316,7 +317,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=True, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -344,7 +345,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=True, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -356,7 +357,7 @@ class TestLogging(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=True, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_logging", "MyMainWidget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -385,3 +386,8 @@ class TestLogging(MnemosyneTest):
         arch_con = sqlite3.connect(archive_path)
         assert arch_con.execute("select count() from log").fetchone()[0] == 11
 
+    def test_log_warn_about_too_many_cards(self):
+        timestamp = int(time.time())
+        self.database().log_warn_about_too_many_cards(timestamp)
+        results = self.database().con.execute("""select timestamp from log WHERE event_type=? and timestamp = ?""", (EventTypes.WARNED_TOO_MANY_CARDS, timestamp)).fetchall()
+        assert 1 == len(results)

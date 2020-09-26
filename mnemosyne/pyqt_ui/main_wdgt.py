@@ -4,19 +4,19 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.pyqt_ui.ui_main_wdgt import Ui_MainWdgt
 from mnemosyne.libmnemosyne.ui_components.main_widget import MainWidget
- 
+
 # Note: inheritance from Ui_MainWdgt should come last, as it inherits
 # directly from 'object' with supporting a correct super().__init__
 # call.
 
 class MainWdgt(QtWidgets.QMainWindow, MainWidget, Ui_MainWdgt):
-    
+
     def __init__(self, **kwds):
         super().__init__(**kwds)
-        self.setupUi(self)    
+        self.setupUi(self)
         # Qt designer does not allow setting multiple shortcuts per action.
         self.actionDeleteCurrentCard.setShortcuts\
             ([QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace])
@@ -65,12 +65,12 @@ class MainWdgt(QtWidgets.QMainWindow, MainWidget, Ui_MainWdgt):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.controller_heartbeat)
         self.timer.start(1000)  # 1 sec.
-        
+
     def change_study_mode(self, action):
         action.setChecked(True)
         study_mode = self.study_mode_for_action[action]
         self.controller().set_study_mode(study_mode)
-        
+
     def controller_heartbeat(self):
         # Need late binding to allow for inheritance.
         self.controller().heartbeat()
@@ -112,6 +112,10 @@ class MainWdgt(QtWidgets.QMainWindow, MainWidget, Ui_MainWdgt):
     def show_error(self, text):
         QtWidgets.QMessageBox.critical(self.top_window(), _("Mnemosyne"), text)
 
+    def handle_keyboard_interrupt(self, text):
+        self._store_state()
+        QtWidgets.QApplication.exit()
+
     def default_font_size(self):
         return QtWidgets.qApp.font().pointSize()
 
@@ -119,7 +123,7 @@ class MainWdgt(QtWidgets.QMainWindow, MainWidget, Ui_MainWdgt):
         filename, _ = QtWidgets.QFileDialog.\
             getOpenFileName(self, caption, path, filter)
         return filename
-    
+
     def get_filename_to_save(self, path, filter, caption=""):
         filename, _ = QtWidgets.QFileDialog.\
             getSaveFileName(self, caption, path, filter)
@@ -134,6 +138,7 @@ class MainWdgt(QtWidgets.QMainWindow, MainWidget, Ui_MainWdgt):
             self.progress_bar = None
         if not self.progress_bar:
             self.progress_bar = QtWidgets.QProgressDialog(self.top_window())
+            self.progress_bar.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)
             self.progress_bar.setWindowFlags(QtCore.Qt.Dialog \
                 | QtCore.Qt.CustomizeWindowHint \
                 | QtCore.Qt.WindowTitleHint \

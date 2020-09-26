@@ -14,7 +14,7 @@ from openSM2sync.log_entry import EventTypes
 from mnemosyne.libmnemosyne.tag import Tag
 from mnemosyne.libmnemosyne.fact import Fact
 from mnemosyne.libmnemosyne.card import Card
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.database import Database
 from mnemosyne.libmnemosyne.card_type import CardType
 from mnemosyne.libmnemosyne.fact_view import FactView
@@ -757,7 +757,7 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
             self.con.execute("select _id from tags")]
         result.sort(key=lambda x: numeric_string_cmp_key(x.name))
         index = 0
-        # __UNTAGGED__ is typically at the head of the list, apart when tags
+        # __UNTAGGED__ is typically at the head of the list, except when tags
         # start with numbers.
         for tag in result:
             if tag.name == "__UNTAGGED__":
@@ -825,6 +825,29 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
     def has_fact_with_id(self, id):
         return self.con.execute("select 1 from facts where id=? limit 1",
             (id, )).fetchone() is not None
+
+    def fact_ids_forgotten_and_learned_today(self, start_of_day, end_of_day):
+        return (cursor[0] for cursor in self.con.execute(
+            """
+            select cards._fact_id from log inner join cards where
+            log.object_id = cards.id and log.timestamp >= :start_of_day and
+            log.timestamp < :end_of_day and log.event_type = :event_type and
+            log.grade >= 2 and log.object_id in (
+              select object_id from log where timestamp >= :start_of_day and
+              timestamp < :end_of_day and event_type = :event_type and
+              grade < 2 and ret_reps > 0 group by object_id)
+            group by log.object_id
+            """,
+            {"start_of_day": start_of_day,
+             "end_of_day": end_of_day,
+             "event_type": EventTypes.REPETITION}).fetchall())
+
+    def fact_ids_newly_learned_today(self, start_of_day, end_of_day):
+        return (cursor[0] for cursor in self.con.execute(
+            """select cards._fact_id from log inner join cards where
+            log.object_id = cards.id and ?<=log.timestamp and log.timestamp<?
+            and log.event_type=? and log.grade>=2 and log.ret_reps==0""",
+            (start_of_day, end_of_day, EventTypes.REPETITION)).fetchall())
 
     #
     # Cards.
@@ -1154,8 +1177,8 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
             criteria_to_activate_card_type_in = [current_criterion]
         else:
             answer = self.main_widget().show_question(\
-                _("Make new card type active in saved set '%s'?") % \
-                (saved_criterion.name,), _("Yes"), _("No"), "")
+                _("Make new card type '%s' active in saved set '%s'?") % \
+                (card_type.name, saved_criterion.name), _("Yes"), _("No"), "")
             if answer == 1:  # No.
                 criteria_to_activate_card_type_in = []
             else:
@@ -1550,7 +1573,7 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
 
     def recently_memorised_count(self, max_ret_reps):
         return self.con.execute("""select count() from cards where active=1
-            and ret_reps between 1 and ?""",
+            and acq_reps>0 and ret_reps between 1 and ?""",
             (max_ret_reps, )).fetchone()[0]
 
     #
@@ -1565,7 +1588,7 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
                                   limit=-1, max_ret_reps=-1):
         sort_key = self._process_sort_key(sort_key)
         extra_cond = "" if max_ret_reps == -1 else str(
-            "and acq_reps>1 and ret_reps between 1 and " + str(max_ret_reps))
+            "and acq_reps>0 and ret_reps between 1 and " + str(max_ret_reps))
         return ((cursor[0], cursor[1]) for cursor in self.con.execute("""
             select _id, _fact_id from cards where active=1 and scheduler_data=?
             %s order by %s limit ?"""
@@ -1573,10 +1596,18 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
 
     def scheduler_data_count(self, scheduler_data, max_ret_reps=-1):
         extra_cond = "" if max_ret_reps == -1 else str(
-            "and acq_reps>1 and ret_reps between 1 and " + str(max_ret_reps))
+            "and acq_reps>0 and ret_reps between 1 and " + str(max_ret_reps))
         return self.con.execute("""select count() from cards
             where active=1 and scheduler_data=? %s """ % extra_cond,
             (scheduler_data, )).fetchone()[0]
+
+    def has_already_warned_today(self, start_of_day, end_of_day):
+        result = self.database().con.execute(
+            """select timestamp from log where ? <= log.timestamp and
+            log.timestamp <? and log.event_type=?""",
+            (start_of_day, end_of_day,
+             EventTypes.WARNED_TOO_MANY_CARDS)).fetchall()
+        return True if len(result) > 0 else False
 
     #
     # Extra queries for language analysis.
@@ -1603,4 +1634,3 @@ _("Putting a database on a network drive is forbidden under Windows to avoid dat
             self._where_clause_known_recognition_questions(card_type_ids)
         return (cursor[0] for cursor in \
                 self.con.execute("select question from cards " + clause, args))
-

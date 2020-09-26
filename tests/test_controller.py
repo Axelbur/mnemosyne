@@ -51,7 +51,7 @@ class TestController(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-            ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+            ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_controller", "Widget"))
         self.mnemosyne.components.append(\
@@ -199,3 +199,13 @@ class TestController(MnemosyneTest):
         global answer
         answer = 0
         self.controller().delete_current_card()
+
+    def test_retain_only_child_tags(self):
+        c = self.controller()
+        assert c._retain_only_child_tags(["a"]) == ["a"]
+        assert sorted(c._retain_only_child_tags(["a", "b"])) == sorted(["a", "b"])
+        assert c._retain_only_child_tags(["a", "a::b"]) == ["a::b"]
+        assert c._retain_only_child_tags(["a", "a::b", "a::b::c"]) == ["a::b::c"]
+        assert c._retain_only_child_tags(["a", "a::b::c"]) == ["a::b::c"]
+        assert c._retain_only_child_tags(["a::b", "a::b::c"]) == ["a::b::c"]
+        assert c._retain_only_child_tags(["a::b::c"]) == ["a::b::c"]

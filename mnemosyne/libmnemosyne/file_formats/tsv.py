@@ -5,7 +5,7 @@
 import os
 import re
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.file_format import FileFormat
 from mnemosyne.libmnemosyne.file_formats.media_preprocessor \
     import MediaPreprocessor
@@ -46,7 +46,13 @@ class Tsv(FileFormat, MediaPreprocessor):
             # Parse html style escaped unicode (e.g. &#33267;).
             for match in re0.finditer(line):
                 # Integer part.
-                u = chr(int(match.group(1)))
+                escaped = match.group(1)
+                if escaped[0] == "x":
+                    escaped = "0" + escaped
+                if "x" in escaped:
+                    u = chr(int(escaped, 16))
+                else:
+                    u = chr(int(escaped))
                 # Integer part with &# and ;.
                 line = line.replace(match.group(), u)
             if len(line) == 0:
@@ -56,12 +62,22 @@ class Tsv(FileFormat, MediaPreprocessor):
             fields = line.split("\t")
             if len(fields) >= 3:  # Vocabulary card.
                 if len(fields) >= 4:
+                    if not fields[0] or not fields[2]:
+                        self.main_widget().show_error(\
+                            _("Required field missing on line") \
+                            + " " + str(line_number) + ":\n" + line)
+                        return
                     facts_data.append({"f": fields[0], "p_1": fields[1],
                         "m_1": fields[2], "n": fields[3]})
                 else:
                     facts_data.append({"f": fields[0], "p_1": fields[1],
                         "m_1": fields[2]})
             elif len(fields) == 2:  # Front-to-back only.
+                if not fields[0] :
+                    self.main_widget().show_error(\
+                        _("Required field missing on line") \
+                        + " " + str(line_number) + ":\n" + line)
+                    return
                 facts_data.append({"f": fields[0], "b": fields[1]})
             else:  # Malformed line.
                 self.main_widget().show_error(_("Badly formed input on line") \

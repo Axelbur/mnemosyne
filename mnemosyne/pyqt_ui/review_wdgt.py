@@ -2,11 +2,12 @@
 # review_wdgt.py <Peter.Bienstman@UGent.be>
 #
 
-from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
 import os
 import sys
 
-from mnemosyne.libmnemosyne.translator import _
+from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.pyqt_ui.ui_review_wdgt import Ui_ReviewWdgt
 from mnemosyne.libmnemosyne.ui_components.review_widget import ReviewWidget
 
@@ -267,6 +268,7 @@ class ReviewWdgt(QtWidgets.QWidget, QAOptimalSplit, ReviewWidget, Ui_ReviewWdgt)
     def __init__(self, **kwds):
         super().__init__(**kwds)
         parent = self.main_widget()
+
         parent.setCentralWidget(self)
         self.setupUi(self)
         QAOptimalSplit.setup(self)
@@ -528,7 +530,7 @@ class ReviewWdgt(QtWidgets.QWidget, QAOptimalSplit, ReviewWidget, Ui_ReviewWdgt)
             self.play_next_file()
 
     def stop_media(self):
-        if self.mplayer is not None:
+        if self.mplayer and self.mplayer.state() == QtCore.QProcess.Running:
             self.mplayer.write(b"quit\n");
         self.media_queue = []
 

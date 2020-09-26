@@ -4,7 +4,7 @@
 
 import copy
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.card_type import CardType
 from mnemosyne.libmnemosyne.plugin import Plugin
 from mnemosyne.libmnemosyne.fact_view import FactView
@@ -52,4 +52,4 @@ class MapPlugin(Plugin):
     description = _("""A card type for learning locations on a map.\n
 Displays the answer map on top of the question map, rather than below it as a second map.""")
     components = [Map]
-    supported_API_level = 2
+    supported_API_level = 3

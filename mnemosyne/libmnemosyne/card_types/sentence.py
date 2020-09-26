@@ -5,7 +5,7 @@
 import re
 import copy
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.card import Card
 from mnemosyne.libmnemosyne.plugin import Plugin
 from mnemosyne.libmnemosyne.card_type import CardType
@@ -61,11 +61,11 @@ class Sentence(Cloze):
         data = copy.copy(card.fact.data)
         # Recognition card.
         if card.fact_view == self.fact_views[0]:
-            question, answer = self._q_a_from_cloze\
+            question, answer = self.q_a_from_cloze\
                 (card.fact["f"], -1)
         # Production card.
         else:
-            question, answer = self._q_a_from_cloze\
+            question, answer = self.q_a_from_cloze\
                 (card.fact["f"], card.extra_data["index"])
             # Entire sentence clozed.
             if question.strip() == "[...]" and "m_1" in data:
@@ -95,4 +95,4 @@ class SentencePlugin(Plugin):
     description = _("""A card type using sentences to study foreign languages.\n
 Apart from simple recognition of the sentence, you can also add production cards using close deletion.\nE.g. if in the sentence field you write "La [casa:house] es [grande:big]", you'll get cards with questions like "La [house] es grande".""")
     components = [Sentence]
-    supported_API_level = 2
+    supported_API_level = 3

@@ -57,7 +57,7 @@ class TestMnemosyne1XMLImport(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
             [("mnemosyne_test", "TestReviewWidget")]
         self.mnemosyne.components.append(\
@@ -85,6 +85,7 @@ class TestMnemosyne1XMLImport(MnemosyneTest):
         self.xml_importer().do_import(filename)
         assert last_error.startswith("XML file does not seem")
 
+    @MnemosyneTest.set_timezone_utc
     def test_card_type_1(self):
         global answer
         answer = 0

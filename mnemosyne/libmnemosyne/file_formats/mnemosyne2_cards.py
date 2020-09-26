@@ -13,7 +13,7 @@ from openSM2sync.log_entry import LogEntry
 from openSM2sync.log_entry import EventTypes
 from openSM2sync.text_formats.xml_format import XMLFormat
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.utils import MnemosyneError
 from mnemosyne.libmnemosyne.file_format import FileFormat
 
@@ -34,7 +34,7 @@ class Mnemosyne2Cards(FileFormat):
         if used_for_merging_dbs is True:
             metadata = {}
         else:
-            metadata = self.controller().show_export_metadata_dialog()
+            metadata = self.main_widget().show_export_metadata_dialog()
         if metadata is None:  # Cancelled.
             os.chdir(self.orig_dir)
             return -1
@@ -111,8 +111,7 @@ class Mnemosyne2Cards(FileFormat):
             log_entry = LogEntry()
             log_entry["type"] = EventTypes.ADDED_MEDIA_FILE
             log_entry["fname"] = media_filename
-            xml_file.write(str(xml_format.\
-                repr_log_entry(log_entry).encode("utf-8"))[2:-2])
+            xml_file.write(str(xml_format.repr_log_entry(log_entry)))
             w.increase_progress(1)
         for _fact_id in active_objects["_fact_ids"]:
             fact = db.fact(_fact_id, is_id_internal=True)
@@ -213,7 +212,7 @@ class Mnemosyne2Cards(FileFormat):
             for line in open(metadata_filename, encoding="utf-8"):
                 key, value = line.split(":", 1)
                 metadata[key] = value.replace("<br>", "\n")
-            self.controller().show_export_metadata_dialog(\
+            self.main_widget().show_export_metadata_dialog(\
                 metadata, read_only=True)
         # Parse XML.
         w.set_progress_text(_("Importing cards..."))

@@ -9,8 +9,10 @@ import time
 import sqlite3
 import threading
 import importlib
+import textwrap
+from locale import getdefaultlocale
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.component import Component
 from mnemosyne.libmnemosyne.schedulers.cramming import RANDOM
 from mnemosyne.libmnemosyne.utils import rand_uuid, traceback_string
@@ -20,60 +22,60 @@ DAY = 24 * HOUR # Seconds in a day.
 
 re_long_int = re.compile(r"\d+L")
 
+def config_py():
+  return textwrap.dedent(
+  """  # Mnemosyne configuration file.
 
-config_py = \
-"""# Mnemosyne configuration file.
+  # This file contains settings which we deem to be too specialised to be
+  # accesible from the GUI. However, if you use some of these settings, feel
+  # free to inform the developers so that it can be re-evaluated if these
+  # settings need to be exposed in the GUI.
 
-# This file contains settings which we deem to be too specialised to be
-# accesible from the GUI. However, if you use some of these settings, feel
-# free to inform the developers so that it can be re-evaluated if these
-# settings need to be exposed in the GUI.
+  # Science server. Only change when prompted by the developers.
+  science_server = "mnemosyne-proj.dyndns.org:80"
 
-# Science server. Only change when prompted by the developers.
-science_server = "mnemosyne-proj.dyndns.org:80"
+  # Set to True to prevent you from accidentally revealing the answer when
+  # clicking the edit button.
+  only_editable_when_answer_shown = False
 
-# Set to True to prevent you from accidentally revealing the answer when
-# clicking the edit button.
-only_editable_when_answer_shown = False
+  # Set to False if you don't want the tag names to be shown in the review
+  # window.
+  show_tags_during_review = True
 
-# Set to False if you don't want the tag names to be shown in the review
-# window.
-show_tags_during_review = True
+  # The number of daily backups to keep. Set to -1 for no limit.
+  max_backups = 10
 
-# The number of daily backups to keep. Set to -1 for no limit.
-max_backups = 10
+  # Start the card browser with the last used colum sort. Can have a serious
+  # performance penalty for large databases.
+  start_card_browser_sorted = False
 
-# Start the card browser with the last used colum sort. Can have a serious
-# performance penalty for large databases.
-start_card_browser_sorted = False
+  # The moment the new day starts. Defaults to 3 am. Could be useful to change
+  # if you are a night bird. You can only set the hours, not minutes, and
+  # midnight corresponds to 0.
+  day_starts_at = 3
 
-# The moment the new day starts. Defaults to 3 am. Could be useful to change
-# if you are a night bird. You can only set the hours, not minutes, and
-# midnight corresponds to 0.
-day_starts_at = 3
+  # On mobile clients with slow SD cards copying a large database for the backup
+  # before sync can take longer than the sync itself, so we offer reckless users
+  # the possibility to skip this.
+  backup_before_sync = True
 
-# On mobile clients with slow SD cards copying a large database for the backup
-# before sync can take longer than the sync itself, so we offer reckless users
-# the possibility to skip this.
-backup_before_sync = True
+  # Latex preamble. Note that for the pre- and postamble you need to use double
+  # slashes instead of single slashes here, to have them escaped when Python
+  # reads them in.
+  latex_preamble = r\"\"\"
+  \documentclass[12pt]{article}
+  \pagestyle{empty}
+  \\begin{document}\"\"\"
 
-# Latex preamble. Note that for the pre- and postamble you need to use double
-# slashes instead of single slashes here, to have them escaped when Python
-# reads them in.
-latex_preamble = r\"\"\"
-\documentclass[12pt]{article}
-\pagestyle{empty}
-\\begin{document}\"\"\"
+  # Latex postamble.
+  latex_postamble = r\"\"\"\end{document}\"\"\"
 
-# Latex postamble.
-latex_postamble = r\"\"\"\end{document}\"\"\"
+  # Latex command.
+  latex = "latex -interaction=nonstopmode"
 
-# Latex command.
-latex = "latex -interaction=nonstopmode"
-
-# Latex dvipng command.
-dvipng = "dvipng -D 200 -T tight tmp.dvi"
-"""
+  # Latex dvipng command.
+  dvipng = "dvipng -D 200 -T tight tmp.dvi"
+  """)
 
 class Configuration(Component, dict):
 
@@ -122,6 +124,10 @@ class Configuration(Component, dict):
              "background_colour": {}, # [card_type.id]
              "alignment": {}, # [card_type.id]
              "hide_pronunciation_field": {}, # [card_type.id]
+             "language_id": {}, # [card_type.id], ISO code
+             "sublanguage_id": {}, # [card_type.id], ISO code
+             "foreign_fact_key": {}, # [card_type.id]
+             "translation_language_id": {}, # [card_type.id], ISO code
              "non_latin_font_size_increase": 0,
              "non_memorised_cards_in_hand": 10,
              "randomise_new_cards": False,
@@ -132,7 +138,7 @@ class Configuration(Component, dict):
              "show_intervals": "never",
              "only_editable_when_answer_shown": False,
              "show_tags_during_review": True,
-             "ui_language": "en",
+             "ui_language": self.default_language(),
              "max_backups": 10,
              "backup_before_sync": True,
              "check_for_edited_local_media_files": False,
@@ -172,7 +178,8 @@ class Configuration(Component, dict):
              "export_format": None,
              "last_db_maintenance": time.time() - 1 * DAY,
              "QA_split": "fixed", # "fixed", "adaptive", "single_window",
-             "study_mode": "ScheduledForgottenNew"
+             "study_mode": "ScheduledForgottenNew",
+             "tts_dir_for_card_type_id": {} # card_type_id, dir
             }.items()):
             self.setdefault(key, value)
         # These keys will be shared in the sync protocol. Front-ends can
@@ -182,7 +189,8 @@ class Configuration(Component, dict):
              "hide_pronunciation_field", "non_memorised_cards_in_hand",
              "randomise_new_cards", "randomise_scheduled_cards",
              "ui_language", "day_starts_at", "latex_preamble",
-             "latex_postamble", "latex", "dvipng", "max_backups"]
+             "latex_postamble", "latex", "dvipng", "max_backups",
+             "language_id", "sublanguage_id", "foreign_fact_key"]
         # If the user id is not set, it's either because this is the first run
         # of the program, or because the user deleted the config file. In the
         # latter case, we try to recuperate the id from the history files.
@@ -322,7 +330,7 @@ class Configuration(Component, dict):
         config_file = join(self.config_dir, "config.py")
         if not exists(config_file):
             f = open(config_file, "w")
-            print(config_py, file=f)
+            print(config_py(), file=f)
             f.close()
         # Create machine_id. Do this in a separate file, as extra warning
         # signal that people should not copy this file to a different machine.
@@ -331,6 +339,13 @@ class Configuration(Component, dict):
             f = open(machine_id_file, "w")
             print(rand_uuid(), file=f)
             f.close()
+
+    card_type_properties_generic = ["background_colour", "alignment",
+        "hide_pronunciation_field", "language_id",
+        "sublanguage_id", "foreign_fact_key", "translation_language_id"]
+    card_type_properties_for_fact_key = ["font", "font_colour"]
+    card_type_properties = card_type_properties_generic + \
+        card_type_properties_for_fact_key
 
     def set_card_type_property(self, property_name, property_value, card_type,
             fact_key=None):
@@ -344,31 +359,31 @@ class Configuration(Component, dict):
 
         """
 
-        if property_name not in ["background_colour", "font", "font_colour",
-            "alignment", "hide_pronunciation_field"]:
+        if property_name not in self.card_type_properties:
             raise KeyError
         # With the nested directories, we don't fall back on self.__setitem__,
         # so we have to log a event here ourselves.
         if property_name in self.keys_to_sync:
-            self.log().edited_setting(property_name)
-        if property_name in ["background_colour", "alignment",
-                             "hide_pronunciation_field"]:
-            self[property_name][card_type.id] = property_value
-            return
-        self[property_name].setdefault(card_type.id, {})
-        for _fact_key in card_type.fact_keys():
-            self[property_name][card_type.id].setdefault(_fact_key, None)
-        if not fact_key:
-            fact_keys = card_type.fact_keys()
+          self.log().edited_setting(property_name)
+        if property_name in self.card_type_properties_generic:
+            if property_value is None:
+                self[property_name].pop(card_type.id, None)
+            else:
+                self[property_name][card_type.id] = property_value
         else:
-            fact_keys = [fact_key]
-        for _fact_key in fact_keys:
-            self[property_name][card_type.id][_fact_key] = property_value
+            self[property_name].setdefault(card_type.id, {})
+            for _fact_key in card_type.fact_keys():
+                self[property_name][card_type.id].setdefault(_fact_key, None)
+            if not fact_key:
+                fact_keys = card_type.fact_keys()
+            else:
+                fact_keys = [fact_key]
+            for _fact_key in fact_keys:
+                self[property_name][card_type.id][_fact_key] = property_value
 
     def card_type_property(self, property_name, card_type, fact_key=None,
                             default=None):
-        if property_name in ["background_colour", "alignment",
-                             "hide_pronunciation_field"]:
+        if property_name in self.card_type_properties_generic:
             try:
                 return self[property_name][card_type.id]
             except KeyError:
@@ -380,23 +395,21 @@ class Configuration(Component, dict):
                 return default
 
     def clone_card_type_properties(self, old_card_type, new_card_type):
-        for property_name in ["font", "font_colour"]:
-            for fact_key in new_card_type.fact_keys():
-                old_value = self.card_type_property(property_name,
-                    old_card_type, fact_key)
-                if old_value:
-                    self.set_card_type_property(property_name, old_value, \
-                        new_card_type, fact_key)
-        for property_name in ["background_colour", "alignment",
-                             "hide_pronunciation_field"]:
-            old_value = self.card_type_property(property_name, old_card_type)
-            if old_value:
-                self.set_card_type_property(\
-                    property_name, old_value, new_card_type)
+      for property_name in self.card_type_properties_generic:
+          old_value = self.card_type_property(property_name, old_card_type)
+          if old_value:
+              self.set_card_type_property(\
+                  property_name, old_value, new_card_type)
+      for property_name in self.card_type_properties_for_fact_key:
+          for fact_key in new_card_type.fact_keys():
+              old_value = self.card_type_property(property_name,
+                  old_card_type, fact_key)
+              if old_value:
+                  self.set_card_type_property(property_name, old_value, \
+                      new_card_type, fact_key)
 
     def delete_card_type_properties(self, card_type):
-        for property_name in ["background_colour", "font", "font_colour",
-            "alignment", "hide_pronunciation_field"]:
+        for property_name in self.card_type_properties:
             if card_type.id in self[property_name]:
                 del self[property_name][card_type.id]
 
@@ -437,3 +450,36 @@ class Configuration(Component, dict):
         from mnemosyne.libmnemosyne.component_manager import \
              migrate_component_manager
         migrate_component_manager(old_user_id, new_user_id)
+        self.save()
+
+    def default_language(self):
+        """use the OS language settings and if possible return with the
+        language code like 'en', 'de', 'it', etc.  If we don't have a
+        translation for the default OS language return with the default 'en'
+
+        """
+        # Use the default OS language settings is possible.
+        # getdefaultlocale is OS independent and works on all platforms.
+        system_language, _ = getdefaultlocale()
+        # if no default locale can be found, default to English
+        if system_language is None:
+            system_language = 'en_us'
+        lang_code = system_language.split("_")[0]
+
+        # Special case ca@valencia, we only support this specific one.
+        if "valencia" in system_language:
+            return "ca@valencia"
+
+        # Languages with multiple dialect like zh_CN, zh_TW, zh_HK, pt_BR
+        # comes first.
+        if system_language in self.gui_translator().supported_languages():
+            return system_language
+        # Languages with only 1 dialect.
+        elif lang_code in self.gui_translator().supported_languages():
+            default_lang = lang_code
+        # Default should be english always if no better match based on the
+        # default OS language.
+        else:
+            default_lang = "en"
+
+        return default_lang

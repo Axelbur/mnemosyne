@@ -4,7 +4,7 @@
 
 import re
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.card import Card
 from mnemosyne.libmnemosyne.plugin import Plugin
 from mnemosyne.libmnemosyne.card_type import CardType
@@ -56,7 +56,7 @@ class Cloze(CardType):
             text = f.run(text)
         return bool(cloze_re.search(text))
 
-    def _q_a_from_cloze(self, text, index):
+    def q_a_from_cloze(self, text, index):
 
         """Auxiliary function used by other card types to return question
         and answer for the cloze with a given index in a text which can have
@@ -98,7 +98,7 @@ class Cloze(CardType):
         return question, answer
 
     def fact_data(self, card):
-        question, answer = self._q_a_from_cloze\
+        question, answer = self.q_a_from_cloze\
             (card.fact["text"], card.extra_data["index"])
         return {"f": question, "b": answer}
 
@@ -170,4 +170,4 @@ E.g., the text \"The capital of [France] is [Paris]\", will give cards with ques
 Editing the text will automatically update all sister cards.\n\nYou can also specify hints, e.g. [cloze:hint] will show
  [hint] in the question as opposed to [...].""")
     components = [Cloze]
-    supported_API_level = 2
+    supported_API_level = 3

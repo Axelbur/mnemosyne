@@ -7,7 +7,7 @@ from copy import deepcopy
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from mnemosyne.libmnemosyne.fact import Fact
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.component import Component
 from mnemosyne.pyqt_ui.preview_cards_dlg import PreviewCardsDlg
 from mnemosyne.libmnemosyne.ui_components.configuration_widget import \
@@ -148,6 +148,8 @@ class ConfigurationWdgtCardAppearance(QtWidgets.QWidget, ConfigurationWidget,
         if len(self.affected_card_types) > 1:
             font_strings = set()
             for card_type in self.affected_card_types:
+                if card_type.hidden_from_UI:
+                    continue
                 font_strings.add(self.config().card_type_property(\
                     "font", card_type, card_type.fact_keys_and_names[0][0]))
             if len(font_strings) > 1:

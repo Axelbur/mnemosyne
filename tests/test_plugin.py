@@ -33,11 +33,11 @@ class TestPlugin(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_plugin", "Widget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
-            [("mnemosyne_test", "TestReviewWidget")]        
+            [("mnemosyne_test", "TestReviewWidget")]
         self.mnemosyne.initialise(os.path.abspath("dot_test"), automatic_upgrades=False)
         self.review_controller().reset()
 
@@ -58,7 +58,7 @@ class TestPlugin(MnemosyneTest):
             name = "myplugin"
             description = "MyPlugin"
             components = [MyCardType]
-            supported_API_level = 2
+            supported_API_level = 3
 
         p = MyPlugin(self.mnemosyne.component_manager)
 
@@ -92,7 +92,7 @@ class TestPlugin(MnemosyneTest):
             name = "myplugin"
             description = "MyPlugin"
             components = [MyCardType]
-            supported_API_level = 2
+            supported_API_level = 3
 
         p = MyPlugin(self.mnemosyne.component_manager)
 
@@ -126,7 +126,7 @@ class TestPlugin(MnemosyneTest):
             name = "myplugin"
             description = "MyPlugin"
             components = [MyCardType]
-            supported_API_level = 2
+            supported_API_level = 3
 
         p = MyPlugin(self.mnemosyne.component_manager)
 
@@ -166,7 +166,7 @@ class TestPlugin(MnemosyneTest):
             name = "Red"
             description = "Red widget for front-to-back cards"
             components = [RedGenericCardTypeWdgt]
-            supported_API_level = 2
+            supported_API_level = 3
 
         p = RedPlugin(self.mnemosyne.component_manager)
         p.activate()

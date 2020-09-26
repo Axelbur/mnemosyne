@@ -65,7 +65,7 @@ class TestMemImport(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
                     asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
             [("mnemosyne_test", "TestReviewWidget")]
         self.mnemosyne.components.append(\
@@ -92,6 +92,7 @@ class TestMemImport(MnemosyneTest):
         assert last_error.strip().endswith("IndexError: Mocked Error")
 
 
+    @MnemosyneTest.set_timezone_utc
     def test_card_type_1(self):
         filename = os.path.join(os.getcwd(), "tests", "files", "1sided.mem")
         self.mem_importer().do_import(filename)
@@ -686,8 +687,13 @@ class TestMemImport(MnemosyneTest):
         assert self.database().card_count_for_grade_and_tag(0, tag, active_only=True) == 0
         from mnemosyne.libmnemosyne.statistics_pages.grades import Grades
         page = Grades(component_manager=self.mnemosyne.component_manager)
-        page.prepare_statistics(tag._id)
-        assert page.y == [0, 0, 0, 0, 0, 0, 0]
+        from mnemosyne.libmnemosyne.tag_tree import TagTree
+        self.tag_tree = TagTree(self.mnemosyne.component_manager, count_cards=False)
+        self.nodes = self.tag_tree.nodes()
+        for index, node in enumerate(self.nodes):
+            if node == "666":
+                page.prepare_statistics(index)
+                assert page.y == [0, 0, 0, 0, 0, 0, 0]
         page.prepare_statistics(-1)
         assert page.y == [0, 2, 0, 0, 0, 0, 0]
 

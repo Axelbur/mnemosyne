@@ -78,7 +78,7 @@
    </widget>
    <widget class="QMenu" name="menu_Study">
     <property name="title">
-     <string>Study</string>
+     <string>S&amp;tudy</string>
     </property>
     <addaction name="actionActivateCards"/>
     <addaction name="separator"/>
@@ -332,7 +332,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>Cram all cards</string>
+    <string>Cram active cards</string>
    </property>
   </action>
  </widget>

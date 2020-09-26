@@ -2,7 +2,7 @@
 # SM2_controller.py <Peter.Bienstman@UGent.be>
 #
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.review_controller import ReviewController
 
 ACQ_PHASE = 0
@@ -133,6 +133,8 @@ _("Use 'Learn ahead of schedule' sparingly. For cramming before an exam, it's mu
         """Note that this also pulls in a new question."""
 
         self.flush_sync_server()
+        if self.card is None:
+            return
         # Guide the learning process.
         if self.config()["shown_learn_new_cards_help"] == False:
             if self.scheduled_count == 1:
@@ -321,7 +323,9 @@ _("You have finished your scheduled reviews. Now, learn as many failed or new ca
         self.review_widget().update_status_bar_counters()
 
     def is_question_showing(self):
-        return self.review_controller()._state == "SELECT SHOW"
+        return self.review_controller()._state == "SELECT SHOW" \
+               and self.card is not None
 
     def is_answer_showing(self):
-        return self.review_controller()._state == "SELECT GRADE"
+        return self.review_controller()._state == "SELECT GRADE" \
+               and self.card is not None

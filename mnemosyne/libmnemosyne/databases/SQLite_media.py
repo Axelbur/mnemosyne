@@ -9,7 +9,10 @@ try:
 except ImportError:
     from md5 import md5
 
-from mnemosyne.libmnemosyne.translator import _
+if "ANDROID" in os.environ:
+    from mnemosyne.android_python.utf8_filenames import *
+
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.utils import normalise_path
 from mnemosyne.libmnemosyne.utils import expand_path, contract_path
 from mnemosyne.libmnemosyne.utils import is_filesystem_case_insensitive

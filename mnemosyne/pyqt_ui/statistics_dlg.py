@@ -4,7 +4,7 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.component import Component
 from mnemosyne.pyqt_ui.ui_statistics_dlg import Ui_StatisticsDlg
 from mnemosyne.libmnemosyne.ui_components.dialogs import StatisticsDialog
@@ -73,7 +73,6 @@ class StatisticsDlg(QtWidgets.QDialog, StatisticsDialog, Ui_StatisticsDlg):
             ["previous_variant_for_statistics_page"][page_index]
         if variant_index >= page.combobox.count():
             variant_index = 0
-        page.combobox.setCurrentIndex(variant_index)
         page.display_variant(variant_index)
 
 

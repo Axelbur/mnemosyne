@@ -104,7 +104,7 @@ class Client(Partner):
         try:
             self.server = socket.gethostbyname(server)
             self.port = port
-            self.backup_file = None
+            backup_file = None
             if self.do_backup:
                 self.ui.set_progress_text("Creating backup...")
                 backup_file = self.database.backup()
@@ -164,6 +164,9 @@ class Client(Partner):
                 # Upload local changes and check for conflicts.
                 result = self.put_client_log_entries()
                 if result == "OK":
+                    # We always need to put the client media files, regardless
+                    # of self.check_for_edited_local_media_files, as there could
+                    # be entirely new media files.
                     self.put_client_media_files()
                     self.get_server_media_files()
                     self.get_server_log_entries()
@@ -322,7 +325,7 @@ class Client(Partner):
                 raise SyncError("Wrong username or password.")
             if "cycle" in message:
                 raise SyncError(\
-                    "Sync cycle detected. Sync through intermediate partner.")
+"Sync cycle detected. Please always sync with the same server. Backup and delete the database and resync from scratch if necessary.")
             if "same machine ids" in message:
                 raise SyncError(\
 "You have manually copied the data directory before sync. Sync needs to start from an empty database.")
@@ -338,9 +341,6 @@ class Client(Partner):
         if self.server_info["database_version"] != client_info["database_version"]:
             raise SyncError("Error: database version mismatch.\n" + \
                 "Make sure you are running the latest Mnemosyne version on both devices involved in the sync.")
-        #if self.server_info["program_version"] != client_info["program_version"]:
-        #    raise SyncError("Error: Mnemosyne version mismatch.\n" + \
-        #        "Make sure you are running the latest Mnemosyne version on both devices involved in the sync.")
         self.database.create_if_needed_partnership_with(\
             self.server_info["machine_id"])
         self.database.merge_partners(self.server_info["partners"])
@@ -544,6 +544,7 @@ class Client(Partner):
         self.ui.set_progress_update_interval(total_size/50)
         for filename in filenames:
             self.request_connection()
+            #print(filename.encode("utf-8", "surrogateescape"))
             self.con.putrequest("PUT",
                 self.url("/client_binary_file?session_token=%s&filename=%s" \
                 % (self.server_info["session_token"],

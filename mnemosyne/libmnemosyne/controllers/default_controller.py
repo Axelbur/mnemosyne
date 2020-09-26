@@ -8,10 +8,11 @@ import copy
 import time
 
 from mnemosyne.libmnemosyne.fact import Fact
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.controller import Controller
 from mnemosyne.libmnemosyne.utils import remove_empty_dirs_in
 from mnemosyne.libmnemosyne.utils import expand_path, contract_path
+from mnemosyne.libmnemosyne.card_type_converter import CardTypeConverter
 
 HOUR = 60 * 60 # Seconds in an hour.
 DAY = 24 * HOUR # Seconds in a day.
@@ -46,7 +47,12 @@ class DefaultController(Controller):
 
         """
 
+        # FIXME: For some reason, datetime.datetime.now() does not respect
+        # DST here, although it does work in a standalone Python program...
+
         if time.time() > self.next_rollover:
+            for f in self.component_manager.all("hook", "at_rollover"):
+                f.run()
             if self.config().server_only:
                 self.database().backup()
                 self.log().dump_to_science_log()
@@ -66,7 +72,12 @@ class DefaultController(Controller):
                 self.log().activate()
                 self.config().save()
                 self.reset_study_mode()
-            self.next_rollover = self.database().start_of_day_n_days_ago(n=-1)
+            previous_rollover = self.next_rollover
+            next_rollover = self.database().start_of_day_n_days_ago(n=-1)
+            # Avoid rare issue with DST.
+            if abs(next_rollover - previous_rollover) < HOUR:
+                next_rollover += DAY
+            self.next_rollover = next_rollover
         if db_maintenance and \
            (time.time() > self.config()["last_db_maintenance"] + 90 * DAY):
             self.component_manager.current("database_maintenance").run()
@@ -123,6 +134,21 @@ class DefaultController(Controller):
             review_controller.update_status_bar_counters()
         self.stopwatch().unpause()
 
+    def _retain_only_child_tags(self, tag_names):
+
+        """In case e.g. tag_names is ["a", "a::b"], return only ["a::b"]."""
+
+        parent_tag_names = []
+        for tag_name in tag_names:
+            partial_tag = ""
+            for node in tag_name.split("::")[:-1]:
+                if partial_tag:
+                    partial_tag += "::"
+                partial_tag += node
+                if partial_tag in tag_names:
+                    parent_tag_names.append(partial_tag)
+        return sorted(list(set(tag_names) - set(parent_tag_names)))
+
     def create_new_cards(self, fact_data, card_type, grade, tag_names,
                          check_for_duplicates=True, save=True):
 
@@ -139,6 +165,7 @@ class DefaultController(Controller):
         assert grade in [-1, 2, 3, 4, 5] # Use -1 for yet to learn cards.
         assert card_type.is_fact_data_valid(fact_data)
         db = self.database()
+        tag_names = self._retain_only_child_tags(tag_names)
         tags = db.get_or_create_tags_with_names(tag_names)
         fact = Fact(fact_data)
         if check_for_duplicates:
@@ -271,14 +298,17 @@ class DefaultController(Controller):
         _("Card data not correctly formatted for conversion.\n\nSkipping ") +\
                 "|".join(list(fact.data.values())) + ".\n")
             return -2
-        converter = self.component_manager.current\
-              ("card_type_converter", used_for=(old_card_type.__class__,
-                                                new_card_type.__class__))
+        # For conversion, we need to look at the top ancestor.
+        ancestor_id_old = old_card_type.id.split("::", maxsplit=1)[0]
+        ancestor_id_new = new_card_type.id.split("::", maxsplit=1)[0]
+        converter = None
+        if ancestor_id_old != ancestor_id_new:
+            converter = self.component_manager.current\
+              ("card_type_converter", CardTypeConverter.card_type_converter_key\
+               (self.card_type_with_id(ancestor_id_old),
+                self.card_type_with_id(ancestor_id_new)))
         if not converter:
-            # Perhaps they have a common ancestor.
-            parents_old = old_card_type.id.split("::")
-            parents_new = new_card_type.id.split("::")
-            if parents_old[0] == parents_new[0]:
+            if ancestor_id_old == ancestor_id_new:
                 edited_cards = cards_from_fact
                 new_fact_view_for = {}
                 for index, old_fact_view in enumerate(old_card_type.fact_views):
@@ -399,6 +429,7 @@ class DefaultController(Controller):
 _("This card has different tags than its sister cards. Update tags for current card only or for all sister cards?"),
             _("Current card only"), _("All sister cards"), "") == 0)
         old_tags = set()
+        new_tag_names = self._retain_only_child_tags(new_tag_names)
         tags = db.get_or_create_tags_with_names(new_tag_names)
         modification_time = int(time.time())
         for sister_card in self.database().cards_from_fact(fact):
@@ -446,6 +477,9 @@ _("This card has different tags than its sister cards. Update tags for current c
         w.close_progress()
 
     def star_current_card(self):
+        review_controller = self.review_controller()
+        if not review_controller.card:
+            return
         self.stopwatch().pause()
         self.flush_sync_server()
         if self.config()["star_help_shown"] == False:
@@ -453,7 +487,6 @@ _("This card has different tags than its sister cards. Update tags for current c
 _("This will add a tag 'Starred' to the current card, so that you can find it back easily, e.g. to edit it on a desktop."))
             self.config()["star_help_shown"] = True
         db = self.database()
-        review_controller = self.review_controller()
         tag = db.get_or_create_tag_with_name(_("Starred"))
         _sister_card_ids = [card._id for card in \
             self.database().cards_from_fact(review_controller.card.fact)]
@@ -464,10 +497,12 @@ _("This will add a tag 'Starred' to the current card, so that you can find it ba
         self.stopwatch().unpause()
 
     def delete_current_card(self):
+        review_controller = self.review_controller()
+        if not review_controller.card:
+            return
         self.stopwatch().pause()
         self.flush_sync_server()
         db = self.database()
-        review_controller = self.review_controller()
         fact = review_controller.card.fact
         no_of_cards = len(db.cards_from_fact(fact))
         if no_of_cards == 1:
@@ -689,7 +724,8 @@ _("Your database will be autosaved before exiting. Also, it is saved every coupl
             self.config()["single_database_help_shown"] = True
         self.flush_sync_server()
         suffix = self.database().suffix
-        old_path = expand_path(self.config()["last_database"], self.config().data_dir)
+        old_path = expand_path(self.config()["last_database"],
+                               self.config().data_dir)
         old_media_dir = self.database().media_dir()
         filename = self.main_widget().get_filename_to_save(path=old_path,
             filter=_("Mnemosyne databases") + " (*%s)" % suffix)
@@ -969,19 +1005,6 @@ _("This will tag all the cards in a given card type which have the same question
         self.component_manager.current("export_dialog")\
             (component_manager=self.component_manager).activate()
         self.stopwatch().unpause()
-
-    def show_export_metadata_dialog(self, metadata=None, read_only=False):
-        self.stopwatch().pause()
-        self.flush_sync_server()
-        dialog = self.component_manager.current("export_metadata_dialog")\
-            (component_manager=self.component_manager)
-        if metadata:
-            dialog.set_values(metadata)
-        if read_only:
-            dialog.set_read_only()
-        dialog.activate()
-        self.stopwatch().unpause()
-        return dialog.values()
 
     def show_sync_dialog(self):
         self.show_sync_dialog_pre()

@@ -68,7 +68,7 @@ class build_windows_installer(Command):
         # Then, create installer with InnoSetup.
         InnoScript().create()
         subprocess.call([\
-            "C:\Program Files (x86)\Inno Setup 5\Compil32.exe", "/cc",
+            "C:\Program Files (x86)\Inno Setup 6\Compil32.exe", "/cc",
             "dist\Mnemosyne\Mnemosyne.iss"])
         # Note: the final setup.exe will be in an Output subdirectory.
 
@@ -79,8 +79,8 @@ if sys.platform == "darwin": # For py2app.
 else:
     base_path = os.path.join(sys.exec_prefix, "lib", "python" + sys.version[:3],
                              "site-packages","mnemosyne")
-    data_files = [("share/applications", ["mnemosyne.desktop"]),
-                  ("share/icons", ["pixmaps/mnemosyne.png"])]
+    data_files = [(os.path.join(sys.exec_prefix, "share", "applications"), ["mnemosyne.desktop"]),
+                  (os.path.join(sys.exec_prefix, "share", "icons"), ["pixmaps/mnemosyne.png"])]
 
 # Translations.
 if sys.platform != "win32":
@@ -109,6 +109,8 @@ py2app_options = {
     mnemosyne.libmnemosyne.databases, mnemosyne.libmnemosyne.file_formats, \
     mnemosyne.libmnemosyne.filters, mnemosyne.libmnemosyne.loggers, \
     mnemosyne.libmnemosyne.plugins, mnemosyne.libmnemosyne.renderers, \
+    mnemosyne.libmnemosyne.gui_translators, mnemosyne.libmnemosyne.languagues, \
+    mnemosyne.libmnemosyne.translators, mnemosyne.libmnemosyne.pronouncers, \
     mnemosyne.libmnemosyne.renderers.anki, \
     mnemosyne.libmnemosyne.renderers.anki.template \
     mnemosyne.libmnemosyne.render_chains, mnemosyne.libmnemosyne.schedulers, \
@@ -137,7 +139,10 @@ package_name = "mnemosyne"
 packages = ["mnemosyne",
             "mnemosyne.pyqt_ui",
             "mnemosyne.libmnemosyne",
+            "mnemosyne.libmnemosyne.gui_translators",
             "mnemosyne.libmnemosyne.translators",
+            "mnemosyne.libmnemosyne.pronouncers",
+            "mnemosyne.libmnemosyne.languages",
             "mnemosyne.libmnemosyne.card_types",
             "mnemosyne.libmnemosyne.databases",
             "mnemosyne.libmnemosyne.file_formats",

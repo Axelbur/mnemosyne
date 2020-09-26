@@ -4,7 +4,7 @@
 
 from PyQt5 import QtGui, QtWidgets
 
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.statistics_pages.grades import Grades
 from mnemosyne.libmnemosyne.statistics_pages.schedule import Schedule
 from mnemosyne.libmnemosyne.statistics_pages.easiness import Easiness
@@ -28,19 +28,27 @@ class PlotStatisticsWdgt(QtWidgets.QWidget, StatisticsWidget):
 
     def activate(self):
         StatisticsWidget.activate(self)
+
         # Late import to speed up app startup.
+        import warnings
+        warnings.filterwarnings("ignore", "(?s).*MATPLOTLIBDATA.*",
+                                category=UserWarning)
         from matplotlib import use
         use("Qt5Agg")
-
         from matplotlib import rcParams
         from matplotlib.figure import Figure
-        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+        from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg \
+            as FigureCanvas
 
-        self.vbox_layout = QtWidgets.QVBoxLayout(self)
+        self.setMinimumSize(640, 480)
+        self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
+                           QtWidgets.QSizePolicy.MinimumExpanding)
         colour = self._background_colour(self.parent)
         fig = Figure(facecolor=colour, edgecolor=colour)
         self.canvas = FigureCanvas(fig)
+        self.vbox_layout = QtWidgets.QVBoxLayout(self)
         self.vbox_layout.addWidget(self.canvas)
+        self.canvas.setMinimumSize(640, 480)
         self.canvas.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
                                   QtWidgets.QSizePolicy.MinimumExpanding)
         self.canvas.setParent(self)

@@ -28,13 +28,16 @@ class TestDBImport(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
                     asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
             [("mnemosyne_test", "TestReviewWidget")]
         self.mnemosyne.components.append(\
             ("test_db_import", "Widget"))
         self.mnemosyne.initialise(os.path.abspath("dot_test"), automatic_upgrades=False)
         self.review_controller().reset()
+        self.merge_db_path = os.path.join(os.getcwd(), "tests", "files", "basedir_to_merge", "to_merge.db")
+        self.merge_db_tmppath = os.path.join(os.path.dirname(self.merge_db_path), "to_merge_tmp.db")
+        shutil.copy2(self.merge_db_path, self.merge_db_tmppath)
 
     def db_importer(self):
         for format in self.mnemosyne.component_manager.all("file_format"):
@@ -55,11 +58,9 @@ class TestDBImport(MnemosyneTest):
                                  grade=-1, tag_names=["default"])[0]
         assert len([self.database().cards()]) == 1
 
-        filename = os.path.join(os.getcwd(), "tests", "files", "basedir_to_merge", "to_merge.db")
-
         global last_error
         last_error = ""
-        self.db_importer().do_import(filename)
+        self.db_importer().do_import(self.merge_db_tmppath)
         assert last_error == ""
         db = self.database()
         assert db.con.execute("select count() from log where event_type != 26").fetchone()[0] == 258
@@ -70,4 +71,11 @@ class TestDBImport(MnemosyneTest):
         card_type = self.database().card_type("2::new clone", is_id_internal=False)
         assert self.config().card_type_property("background_colour", card_type) == 4278233600
 
-
+    def teardown(self):
+        MnemosyneTest.teardown(self)
+        if os.path.exists(self.merge_db_path + "-journal"):
+            os.remove(self.merge_db_path + "-journal")
+        if os.path.exists(self.merge_db_tmppath):
+            os.remove(self.merge_db_tmppath)
+        if os.path.exists(self.merge_db_tmppath + "-journal"):
+            os.remove(self.merge_db_tmppath + "-journal")

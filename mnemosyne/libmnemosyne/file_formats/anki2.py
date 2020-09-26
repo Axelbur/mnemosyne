@@ -10,11 +10,9 @@ import shutil
 import sqlite3
 import zipfile
 
-from xml.sax.saxutils import escape as xml_escape
-
 from mnemosyne.libmnemosyne.fact import Fact
 from mnemosyne.libmnemosyne.card import Card
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.fact_view import FactView
 from mnemosyne.libmnemosyne.component import Component
 from mnemosyne.libmnemosyne.file_format import FileFormat
@@ -145,10 +143,10 @@ class Anki2(FileFormat, MediaPreprocessor):
                 card_type.id = card_type_id
                 card_type.hidden_from_UI = False
                 card_type_for_mid[int(mid)] = card_type
-                vers = models[mid]["vers"] # Version, ignore.
-                tags = models[mid]["tags"] # Seems empty, ignore.
-                did = models[mid]["did"] # Deck id, ignore.
-                usn = models[mid]["usn"] # Syncing related, ignore.
+                #vers = models[mid]["vers"] # Optional version, ignore.
+                #tags = models[mid]["tags"] # Seems empty, ignore.
+                #did = models[mid]["did"] # Deck id, ignore.
+                #usn = models[mid]["usn"] # Syncing related, ignore.
                 if "req" in models[mid]:
                     required = models[mid]["req"]
                     # Cache for a calculation to determine which fields are
@@ -162,14 +160,14 @@ class Anki2(FileFormat, MediaPreprocessor):
                 for field in flds:
                     card_type.fact_keys_and_names.append(\
                         (str(field["ord"]), field["name"]))
-                    media = field["media"] # Reserved for future use, ignore.
-                    sticky = field["sticky"] # Sticky field, ignore.
-                    rtl = field["rtl"] # Text direction, ignore.
+                    #media = field["media"] # Reserved for future use, ignore.
+                    #sticky = field["sticky"] # Sticky field, ignore.
+                    #rtl = field["rtl"] # Text direction, ignore.
                     font_string = field["font"] + "," + str(field["size"]) + \
                         ",-1,5,50,0,0,0,0,0,Regular"
                     self.config().set_card_type_property("font", font_string,
                         card_type, str(field["ord"]))
-                sortf = models[mid]["sortf"] # Sorting field, ignore.
+                #sortf = models[mid]["sortf"] # Sorting field, ignore.
                 tmpls = models[mid]["tmpls"]
                 tmpls.sort(key=lambda x : x["ord"])
                 # Fact views.
@@ -189,18 +187,18 @@ class Anki2(FileFormat, MediaPreprocessor):
                     fact_view.extra_data["bqfmt"] = template["bqfmt"]
                     fact_view.extra_data["bafmt"] = template["bafmt"]
                     fact_view.extra_data["ord"] = template["ord"]
-                    did = template["did"] # Deck id, ignore.
+                    #did = template["did"] # Deck id, ignore.
                     card_type.fact_views.append(fact_view)
                     if fact_view_already_imported:
                         db.update_fact_view(fact_view)
                     else:
                         db.add_fact_view(fact_view)
-                mod = models[mid]["mod"] # Modification time, ignore.
+                #mod = models[mid]["mod"] # Modification time, ignore.
                 type_ = models[mid]["type"] # 0: standard, 1 cloze
                 id = models[mid]["id"]
                 css = models[mid]["css"]
-                latex_preamble = models[mid]["latexPre"] # Ignore.
-                latex_postamble = models[mid]["latexPost"] # Ignore.
+                #latex_preamble = models[mid]["latexPre"] # Ignore.
+                #latex_postamble = models[mid]["latexPost"] # Ignore.
                 # Save to database.
                 card_type.extra_data = {"css":css, "id":id, "type":type_}
                 if card_type_already_imported:
@@ -226,7 +224,9 @@ class Anki2(FileFormat, MediaPreprocessor):
             # csum: checksum, ignore.
             # flags: seems empty, ignore.
             # data: seems empty, ignore.
-            guid = xml_escape(guid)  # Make compatible with openSM2sync.
+            # Make compatible with openSM2sync:
+            guid = guid.replace("`", "ap").replace("\"", "qu")
+            guid = guid.replace("&", "am").replace("<", "lt").replace(">", "gt")
             modification_time_for_nid[id] = mod
             card_type = card_type_for_mid[int(mid)]
             card_type_for_nid[id] = card_type
@@ -342,10 +342,10 @@ class Anki2(FileFormat, MediaPreprocessor):
             card.last_rep = card.next_rep - ivl*86400
             card.easiness = factor/1000 if factor else 2.5
             card.acq_reps = 1   # No information.
-            card.ret_reps = 0 if reps == 0 else reps - 1
+            card.ret_reps = reps
             card.lapses = lapses
-            card.acq_reps_since_lapse = 0  # No information.
-            card.ret_reps_since_lapse = 0  # No information.
+            card.acq_reps_since_lapse = card.acq_reps  # No information.
+            card.ret_reps_since_lapse = card.ret_reps  # No information.
             card.modification_time = modification_time_for_nid[nid]
             self.active = (queue >= 0)
             if type_ == 0:  # 'new', unseen.
@@ -356,6 +356,8 @@ class Anki2(FileFormat, MediaPreprocessor):
                 card.next_rep = mod
             else:  # 'due', retention phase.
                 card.grade = 4  # No information.
+            if card.grade >= 2:
+                assert card.ret_reps_since_lapse != 0 # Issue #93 on github.
             if already_imported:
                 db.update_card(card)
             else:
@@ -379,4 +381,3 @@ class Anki2(FileFormat, MediaPreprocessor):
             shutil.rmtree(tmp_dir)
         w.close_progress()
         self.warned_about_missing_media = False
-

@@ -7,9 +7,12 @@ SPHINXBUILD := sphinx-build
 ifeq (1,$(shell python3 -c "print(1)" 2>&- ))
 PYTHON      := python3
 endif
+
+PYTHON35    := python3
 # If we are on cygwin:
-ifeq (1,$(shell /cygdrive/c/Program\ Files\ \(x86\)/Python36-32/python.exe -c "print(1)" 2>&- ))
-PYTHON      := /cygdrive/c/Program\ Files\ \(x86\)/Python36-32/python.exe
+ifeq (1,$(shell /cygdrive/c/Program\ Files/Python37/python.exe -c "print(1)" 2>&- ))
+PYTHON      := /cygdrive/c/Program\ Files/Python37/python.exe
+PYTHON37    := /cygdrive/c/Program\ Files/Python37/python.exe
 endif
 # If `sphinx-build2` exists:
 ifneq (,$(shell command -v sphinx-build2 2>&- ))
@@ -26,7 +29,7 @@ endif
 
 run: build
 	# For debugging: running the code in place.
-	PYTHONPATH=. $(PYTHON) mnemosyne/pyqt_ui/mnemosyne -d dot_mnemosyne2
+	PYTHONPATH=. $(PYTHON) mnemosyne/pyqt_ui/mnemosyne -d dot_mnemosyne2 
 
 build:
 	# Just the bare minimum to get things running
@@ -50,18 +53,18 @@ test-prep:
 	cd po && make ../mo/de/LC_MESSAGES/mnemosyne.mo
 
 test: test-prep
-	python -m nose tests
+	$(PYTHON) -m nose -v --exe tests
 
 coverage: test-prep
 	rm -rf .coverage cover htmlcov
-	python -m nose tests --with-coverage --cover-erase \
+	$(PYTHON) -m nose tests --exe --with-coverage --cover-erase \
 	--cover-package=mnemosyne.libmnemosyne,openSM2sync || (echo "testsuite failed")
 	coverage html
 	@echo "Open file://$(PWD)/htmlcov/index.html in a browser for a nicer visualization."
 
 coverage-windows: FORCE
 	rm -rf .coverage cover htmlcov
-	python -m nose tests --with-coverage --cover-erase \
+	$(PYTHON) -m nose tests --with-coverage --cover-erase \
 	--cover-package=mnemosyne.libmnemosyne,openSM2sync || (echo "testsuite failed")
 	coverage html
 	firefox htmlcov/index.html || chromium htmlcov/index.html || google-chrome htmlcov/index.html
@@ -70,7 +73,7 @@ profile: FORCE
 	echo "from hotshot import stats" > process_profile.py
 	echo "s = stats.load(\"stats.dat\")" >> process_profile.py
 	echo "s.sort_stats(\"time\").print_stats()" >> process_profile.py
-	python -m nose --with-profile --profile-stats-file=stats.dat
+	$(PYTHON) -m nose --with-profile --profile-stats-file=stats.dat
 	$(PYTHON) process_profile.py
 
 gui-profile: FORCE
@@ -90,7 +93,7 @@ windows-installer: FORCE
 	make build-all-deps
 	$(PYTHON) setup.py build_windows_installer
 	read -p "Press any key when InnoSetup has finished..."
-	V=`$(PYTHON) mnemosyne/version.py` && cp dist/Mnemosyne/Output/setup.exe mnemosyne-$${V}-setup.exe
+	V=`$(PYTHON) mnemosyne/version.py` && cp dist/Mnemosyne/Output/mysetup.exe mnemosyne-$${V}-setup.exe
 
 distrib: FORCE
 	# Erase previous directories to make sure we're clean.
@@ -105,7 +108,7 @@ macos:
 	cd po && make
 
 	# Build the bundled app based on the specification file.
-	pyinstaller mnemosyne.spec
+	pyinstaller --log-level WARN mnemosyne.spec
 
 	# Blank qt.conf to ensure that bundled qt is used over system qt.
 	touch dist/Mnemosyne.app/Contents/Resources/qt.conf
@@ -115,19 +118,26 @@ macos:
 	cp -R mo dist/Mnemosyne.app/Contents/Resources/share/locale
 	ln -s ../Resources/share dist/Mnemosyne.app/Contents/MacOS/share
 
+  # tkinter bug - data directories not present
+	mkdir -p dist/Mnemosyne.app/Contents/MacOS/tk
+	mkdir -p dist/Mnemosyne.app/Contents/MacOS/tcl
+
+  # mplayer bug - override default packaged libpng
+	cp $(shell brew info libpng | grep /usr/local/Cellar/libpng | awk '{print $$1}')/lib/libpng16.16.dylib dist/Mnemosyne.app/Contents/MacOS/libpng16.16.dylib
+
 osx: macos
 
 android: # Creates the assets file with the Python code.
-	rm -f mnemosyne/android/app/src/main/assets/mnemosyne.zip
-	#python -m compileall mnemosyne
-	zip	-r mnemosyne/android/app/src/main/assets/mnemosyne.zip openSM2sync -i \*.py
-	zip -r mnemosyne/android/app/src/main/assets/mnemosyne.zip mnemosyne/libmnemosyne -i \*.py
-	zip	-r mnemosyne/android/app/src/main/assets/mnemosyne.zip mnemosyne/cle -i \*.py
-	zip	mnemosyne/android/app/src/main/assets/mnemosyne.zip mnemosyne/version.py mnemosyne/__init__.py
+	rm -f mnemosyne/android/app/src/main/assets/python/mnemosyne.zip
+	zip	-r mnemosyne/android/app/src/main/assets/python/mnemosyne.zip openSM2sync -i \*.py
+	zip -r mnemosyne/android/app/src/main/assets/python/mnemosyne.zip mnemosyne/libmnemosyne -i \*.py
+	zip	-r mnemosyne/android/app/src/main/assets/python/mnemosyne.zip mnemosyne/android_python -i \*.py
+	zip	mnemosyne/android/app/src/main/assets/python/mnemosyne.zip mnemosyne/version.py mnemosyne/__init__.py
+	$(PYTHON37) compile_zip.py mnemosyne/android/app/src/main/assets/python/mnemosyne.zip
+	#$(PYTHON35) compile_zip.py mnemosyne/android/app/src/main/assets/python/stdlib.zip
 
 clean:
-	rm -f *~ *.pyc *.tgz process_profile.py outside.db outside.db-journal
-	rm -f tests/files/basedir_to_merge/to_merge.db-journal
+	rm -f *~ *.pyc *.tgz process_profile.py
 	rm -rf dist .coverage
 	rm -f -R Mnemosyne.egg-info
 	rm -f -R distrib build bin lib Lib Scripts include dot_mnemosyne2 dot_test dot_sync_*

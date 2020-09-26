@@ -5,6 +5,7 @@
 import os
 import re
 import subprocess as sp
+import sys
 try:
     from hashlib import md5
 except ImportError:
@@ -12,9 +13,12 @@ except ImportError:
 
 from mnemosyne.libmnemosyne.hook import Hook
 from mnemosyne.libmnemosyne.utils import copy
-from mnemosyne.libmnemosyne.translator import _
+from mnemosyne.libmnemosyne.gui_translator import _
 from mnemosyne.libmnemosyne.filter import Filter
 
+if sys.platform == "darwin":
+  sys.path.append("/usr/local/bin")
+  sys.path.append("/Library/TeX/texbin")
 
 # The regular expressions to find the latex tags are global so they don't
 # get recompiled all the time. match.group(1) identifies the text between
@@ -24,7 +28,6 @@ from mnemosyne.libmnemosyne.filter import Filter
 re1 = re.compile(r"<latex>(.+?)</latex>", re.DOTALL | re.IGNORECASE)
 re2 = re.compile(r"<\$>(.+?)</\$>",       re.DOTALL | re.IGNORECASE)
 re3 = re.compile(r"<\$\$>(.+?)</\$\$>",   re.DOTALL | re.IGNORECASE)
-
 
 class Latex(Filter):
 
@@ -63,26 +66,28 @@ class Latex(Filter):
                 os.makedirs(latex_dir)
             previous_dir = os.getcwd()
             os.chdir(latex_dir)
-            if os.path.exists("tmp1.png"):
-                os.remove("tmp1.png")
-            if os.path.exists("tmp.dvi"):
-                os.remove("tmp.dvi")
-            if os.path.exists("tmp.aux"):
-                os.remove("tmp.aux")
-            f = open("tmp.tex", "w")
-            print(self.config()["latex_preamble"], file=f)
-            print(latex_command, file=f)
-            print(self.config()["latex_postamble"], file=f)
-            f.close()
-            in_file = "tmp.tex"
-            self._call_cmd(self.config()["latex"] + [in_file],
-                           "latex_out.txt", in_file)
-            self._call_cmd(self.config()["dvipng"], "dvipng_out.txt")
-            if not os.path.exists("tmp1.png"):
-                return None
-            copy("tmp1.png", img_name)
-            self.log().added_media_file(rel_filename)
-            os.chdir(previous_dir)
+            try:
+                if os.path.exists("tmp1.png"):
+                    os.remove("tmp1.png")
+                if os.path.exists("tmp.dvi"):
+                    os.remove("tmp.dvi")
+                if os.path.exists("tmp.aux"):
+                    os.remove("tmp.aux")
+                f = open("tmp.tex", "w", encoding="utf-8")
+                print(self.config()["latex_preamble"], file=f)
+                print(latex_command, file=f)
+                print(self.config()["latex_postamble"], file=f)
+                f.close()
+                in_file = "tmp.tex"
+                self._call_cmd(self.config()["latex"] + [in_file],
+                               "latex_out.txt", in_file)
+                self._call_cmd(self.config()["dvipng"], "dvipng_out.txt")
+                if not os.path.exists("tmp1.png"):
+                    return None
+                copy("tmp1.png", img_name)
+                self.log().added_media_file(rel_filename)
+            finally:
+                os.chdir(previous_dir)
         return rel_filename
 
     def _call_cmd(self, cmd, out_file, in_file=None):

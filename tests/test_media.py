@@ -35,7 +35,7 @@ class TestMedia(MnemosyneTest):
         self.mnemosyne = Mnemosyne(upload_science_logs=False, interested_in_old_reps=True,
             asynchronous_database=True)
         self.mnemosyne.components.insert(0,
-           ("mnemosyne.libmnemosyne.translators.gettext_translator", "GetTextTranslator"))
+           ("mnemosyne.libmnemosyne.gui_translators.gettext_gui_translator", "GetTextGuiTranslator"))
         self.mnemosyne.components.append(\
             ("test_media", "Widget"))
         self.mnemosyne.gui_for_component["ScheduledForgottenNew"] = \
@@ -83,10 +83,10 @@ class TestMedia(MnemosyneTest):
         assert os.path.exists(os.path.join(self.database().media_dir(), "a.ogg"))
 
         self.controller().show_insert_sound_dialog("")
-        assert os.path.exists(os.path.join(self.database().media_dir(), "a_1_.ogg"))
+        assert os.path.exists(os.path.join(self.database().media_dir(), "a_1.ogg"))
 
         self.controller().show_insert_sound_dialog("")
-        assert os.path.exists(os.path.join(self.database().media_dir(), "a_2_.ogg"))
+        assert os.path.exists(os.path.join(self.database().media_dir(), "a_2.ogg"))
 
     def test_img_1(self):
         global filename
@@ -405,6 +405,7 @@ class TestMedia(MnemosyneTest):
         assert "dot_test" not in self.database().media_dir()
 
     def teardown(self):
+        MnemosyneTest.teardown(self)
         if os.path.exists("a.ogg"):
             os.remove("a.ogg")
         if os.path.exists("b.ogg"):
@@ -417,5 +418,7 @@ class TestMedia(MnemosyneTest):
             shutil.rmtree("sub")
         if os.path.exists("_keep"):
             shutil.rmtree("_keep")
-        MnemosyneTest.teardown(self)
-
+        if os.path.exists("outside.db"):
+            os.remove("outside.db")
+        if os.path.exists("outside.db-journal"):
+            os.remove("outside.db-journal")
